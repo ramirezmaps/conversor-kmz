@@ -253,7 +253,16 @@ def parse_kml_content(kml_content):
     Parsea la totalidad del string XML de un archivo KML.
     Retorna una lista de diccionarios de características ('features').
     """
-    root = ET.fromstring(kml_content)
+    try:
+        from lxml import etree
+        # Usar lxml con recover=True para ignorar errores de XML malformado como "unbound prefix" (ej: gx:)
+        parser = etree.XMLParser(recover=True)
+        root = etree.fromstring(kml_content.encode('utf-8', errors='ignore'), parser=parser)
+    except ImportError:
+        # Fallback agresivo si lxml no está disponible
+        kml_content = re.sub(r'(<\/?)[a-zA-Z0-9_-]+:', r'\1', kml_content)
+        root = ET.fromstring(kml_content)
+        
     features = []
 
     def recursive_parse(elem, current_folder_path=""):
