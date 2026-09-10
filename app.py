@@ -48,7 +48,64 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-def main():
+def gis_to_kmz():
+    st.markdown('<div class="main-header">🗺️ Conversor GIS a KMZ Premium</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">Convierte archivos <b>SHP, GDB, GeoJSON o DXF</b> a un archivo KMZ con popups HTML y estilos.</div>', unsafe_allow_html=True)
+    
+    st.sidebar.header("⚙️ Opciones KMZ")
+    
+    uploaded_file = st.file_uploader(
+        "Carga tu archivo GIS (.zip con SHP/GDB, .geojson, .dxf)",
+        type=["zip", "geojson", "json", "dxf"]
+    )
+    
+    if uploaded_file is not None:
+        file_bytes = uploaded_file.getvalue()
+        filename = uploaded_file.name
+        
+        with st.spinner("Procesando archivo GIS..."):
+            try:
+                from gis_parser import load_gis_file
+                gdfs = load_gis_file(file_bytes, filename)
+            except Exception as e:
+                st.error(f"Error al leer el archivo: {e}")
+                return
+                
+        if not gdfs:
+            st.warning("No se encontraron capas válidas en el archivo.")
+            return
+            
+        st.success(f"Archivo procesado: {len(gdfs)} capas encontradas.")
+        
+        # Agrupar las columnas de todas las capas
+        all_cols = set()
+        for gdf in gdfs.values():
+            all_cols.update([c for c in gdf.columns if c != 'geometry'])
+        
+        group_by_col = st.selectbox(
+            "📁 Agrupar elementos en carpetas por la columna:",
+            options=["Ninguna"] + sorted(list(all_cols)),
+            index=0
+        )
+        
+        if st.button("Generar KMZ Premium", type="primary"):
+            with st.spinner("Generando archivo KMZ con estilos y popups HTML..."):
+                from kmz_generator import export_to_premium_kmz
+                col = group_by_col if group_by_col != "Ninguna" else None
+                try:
+                    kmz_bytes = export_to_premium_kmz(gdfs, group_by_col=col)
+                    
+                    st.download_button(
+                        label="⬇️ Descargar KMZ Premium",
+                        data=kmz_bytes,
+                        file_name=f"{os.path.splitext(filename)[0]}_Premium.kmz",
+                        mime="application/vnd.google-earth.kmz",
+                        key="btn_premium_kmz"
+                    )
+                except Exception as e:
+                    st.error(f"Error generando KMZ: {e}")
+
+def kmz_to_gis():
     st.markdown('<div class="main-header">🗺️ Conversor KMZ/KML a SHP & File Geodatabase (GDB)</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Extrae automáticamente Puntos, Líneas y Polígonos y <b>transforma la información de los Popups HTML</b> en atributos tabulares estructurados.</div>', unsafe_allow_html=True)
 
@@ -439,6 +496,19 @@ def main():
                         mime="application/zip",
                         key="btn_geojson"
                     )
+
+def main():
+    st.sidebar.title("Navegación")
+    modo = st.sidebar.radio(
+        "Elige el módulo:",
+        ["KMZ/KML a GIS", "GIS a KMZ Premium"]
+    )
+    st.sidebar.markdown("---")
+    
+    if modo == "KMZ/KML a GIS":
+        kmz_to_gis()
+    else:
+        gis_to_kmz()
 
 if __name__ == "__main__":
     main()
