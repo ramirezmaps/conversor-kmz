@@ -12,8 +12,6 @@ import pandas as pd
 import folium
 from streamlit_folium import st_folium
 import zipfile
-import requests
-from streamlit_lottie import st_lottie
 
 from kml_parser import load_kmz_or_kml
 from exporter import features_to_geodataframes, export_to_shp_zip, export_to_gdb_zip, sanitize_dataframe_columns
@@ -25,15 +23,13 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilos CSS personalizados (Premium UI & Glassmorphism)
+# Estilos CSS personalizados
 st.markdown("""
     <style>
     .main-header {
-        font-size: 2.5rem;
-        font-weight: 800;
-        background: -webkit-linear-gradient(45deg, #2563EB, #4F46E5, #EC4899);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        font-size: 2.3rem;
+        font-weight: 700;
+        color: #1E3A8A;
         margin-bottom: 0.2rem;
     }
     .sub-header {
@@ -41,40 +37,15 @@ st.markdown("""
         color: #4B5563;
         margin-bottom: 1.5rem;
     }
-    /* Glassmorphism Sidebar */
-    [data-testid="stSidebar"] {
-        background: rgba(128, 128, 128, 0.05) !important;
-        backdrop-filter: blur(15px) !important;
-        -webkit-backdrop-filter: blur(15px) !important;
-        border-right: 1px solid rgba(128, 128, 128, 0.2) !important;
-    }
-    /* Glassmorphism Metric Boxes */
-    div[data-testid="stMetric"] {
-        background: rgba(128, 128, 128, 0.05);
-        border: 1px solid rgba(128, 128, 128, 0.2);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
-        backdrop-filter: blur(15px);
-        -webkit-backdrop-filter: blur(15px);
-        border-radius: 16px;
-        padding: 15px;
-        transition: all 0.3s ease;
-    }
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.2);
-        border-color: rgba(128, 128, 128, 0.4);
+    .metric-box {
+        background-color: #F3F4F6;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+        border-left: 4px solid #2563EB;
     }
     </style>
 """, unsafe_allow_html=True)
-
-def load_lottieurl(url: str):
-    try:
-        r = requests.get(url)
-        if r.status_code != 200:
-            return None
-        return r.json()
-    except:
-        return None
 
 
 def main():
@@ -129,15 +100,6 @@ def main():
         type=["kmz", "kml"],
         help="Selecciona un archivo .kmz o .kml que contenga capas y popups con información."
     )
-
-    if uploaded_file is None:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        # Lottie Animation - Mapa mundial animado
-        lottie_url = "https://assets8.lottiefiles.com/packages/lf20_m6cuL6.json"
-        lottie_json = load_lottieurl(lottie_url)
-        if lottie_json:
-            st_lottie(lottie_json, height=300, key="welcome_lottie")
-        st.info("👆 Por favor, sube un archivo KMZ o KML en el menú lateral para comenzar la magia.")
 
     if uploaded_file is not None:
         file_bytes = uploaded_file.getvalue()
@@ -271,9 +233,9 @@ def main():
                 maxy = max(b[3] for b in bounds_list)
                 center_lat = (miny + maxy) / 2
                 center_lon = (minx + maxx) / 2
-                m = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="OpenStreetMap")
+                m = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB positron")
             else:
-                m = folium.Map(location=[0, 0], zoom_start=2)
+                m = folium.Map(location=[0, 0], zoom_start=2, tiles="CartoDB positron")
 
             colors = {'Puntos': 'red', 'Lineas': 'blue', 'Poligonos': 'green'}
 
