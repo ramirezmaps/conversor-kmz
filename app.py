@@ -143,6 +143,66 @@ def gis_to_kmz():
                 unsafe_allow_html=True
             )
         
+        st.markdown("##### 🗺️ Mapa de Previsualización")
+        with st.expander("Ver mapa interactivo (Muestra hasta 500 elementos por capa para mejor rendimiento)", expanded=False):
+            st.write("Haz clic en las geometrías en el mapa para ver cómo se desplegará tu popup.")
+            import folium
+            from streamlit_folium import st_folium
+            
+            # Convert to WGS84
+            wgs_gdfs = {}
+            for lyr, gdf in gdfs.items():
+                if not gdf.empty:
+                    if gdf.crs is None:
+                        wgs_gdfs[lyr] = gdf.set_crs("EPSG:4326")
+                    elif gdf.crs != "EPSG:4326":
+                        wgs_gdfs[lyr] = gdf.to_crs("EPSG:4326")
+                    else:
+                        wgs_gdfs[lyr] = gdf.copy()
+            
+            bounds_list = [g.total_bounds for g in wgs_gdfs.values() if not g.empty]
+            if bounds_list:
+                minx = min(b[0] for b in bounds_list)
+                miny = min(b[1] for b in bounds_list)
+                maxx = max(b[2] for b in bounds_list)
+                maxy = max(b[3] for b in bounds_list)
+                m_prev = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=12, prefer_canvas=True)
+            else:
+                m_prev = folium.Map(location=[0, 0], zoom_start=2)
+                
+            colors = {'Puntos': '#e6194b', 'Lineas': '#3cb44b', 'Poligonos': '#4363d8'}
+            
+            for layer_name, gdf_layer in wgs_gdfs.items():
+                if gdf_layer.empty:
+                    continue
+                fg = folium.FeatureGroup(name=f"{layer_name} ({len(gdf_layer)})")
+                color = colors.get(layer_name, "#911eb4")
+                
+                # Iterate over top 500 features to keep map responsive
+                for idx, row in gdf_layer.head(500).iterrows():
+                    geom = row['geometry']
+                    if geom is None or geom.is_empty:
+                        continue
+                        
+                    # Generate identical HTML to the KMZ
+                    desc = generate_html_table(row.to_dict(), allowed_cols=popup_cols)
+                    popup = folium.Popup(folium.Html(desc, script=True), max_width=450)
+                    
+                    if geom.geom_type == 'Point':
+                        folium.CircleMarker(
+                            location=[geom.y, geom.x], radius=5, color=color, fill=True, fill_opacity=0.6, popup=popup
+                        ).add_to(fg)
+                    elif geom.geom_type in ['LineString', 'MultiLineString']:
+                        folium.GeoJson(geom, style_function=lambda x, c=color: {'color': c, 'weight': 2}, popup=popup).add_to(fg)
+                    elif geom.geom_type in ['Polygon', 'MultiPolygon']:
+                        folium.GeoJson(geom, style_function=lambda x, c=color: {'color': c, 'fillColor': c, 'weight': 1, 'fillOpacity': 0.4}, popup=popup).add_to(fg)
+                fg.add_to(m_prev)
+                
+            folium.LayerControl().add_to(m_prev)
+            st_folium(m_prev, width=1000, height=450, returned_objects=[])
+        
+        st.markdown("---")
+        
         if st.button("Generar KMZ", type="primary"):
             with st.spinner("Generando archivo KMZ con estilos y popups HTML..."):
                 from kmz_generator import export_to_premium_kmz
