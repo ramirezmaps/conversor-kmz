@@ -44,6 +44,33 @@ st.markdown("""
         text-align: center;
         border-left: 4px solid #2563EB;
     }
+    /* Estilos para hacer el File Uploader más grande y centrado */
+    [data-testid="stFileUploader"] {
+        margin: 2rem auto;
+        padding: 1rem;
+    }
+    [data-testid="stFileUploader"] label {
+        font-size: 1.4rem !important;
+        font-weight: 600;
+        text-align: center;
+        width: 100%;
+        color: #1E3A8A;
+    }
+    [data-testid="stFileUploaderDropzone"] {
+        min-height: 200px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 3px dashed #3B82F6;
+        background-color: #EFF6FF;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+    [data-testid="stFileUploaderDropzone"]:hover {
+        background-color: #DBEAFE;
+        border-color: #2563EB;
+    }
     </style>
 """, unsafe_allow_html=True)
 
