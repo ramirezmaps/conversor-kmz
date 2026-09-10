@@ -228,7 +228,27 @@ def main():
                                             
                     # Mostrar DataFrame excluyendo o formateando la columna geometry
                     df_view = pd.DataFrame(display_gdf.drop(columns=['geometry'], errors='ignore'))
-                    st.dataframe(df_view, width='stretch', height=350)
+                    
+                    event = st.dataframe(
+                        df_view, 
+                        width='stretch', 
+                        height=350,
+                        on_select="rerun",
+                        selection_mode="multi-column"
+                    )
+                    
+                    # Si el usuario hace clic en el encabezado de una columna en la tabla
+                    if event and hasattr(event, "selection") and event.selection.get("columns"):
+                        added = False
+                        for col in event.selection["columns"]:
+                            if col not in st.session_state[f"dropped_cols_{geom_selected}"]:
+                                st.session_state[f"dropped_cols_{geom_selected}"].append(col)
+                                added = True
+                        if added:
+                            if hasattr(st, "rerun"):
+                                st.rerun()
+                            else:
+                                st.experimental_rerun()
 
         # Tab 2: Mapa Interactivo (Folium)
         with tab_map:
