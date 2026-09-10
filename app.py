@@ -198,8 +198,15 @@ def main():
                     st.markdown(f"**Capa `{geom_selected_label}` ({len(display_gdf)} registros, {len(display_gdf.columns) - 1} atributos)**")
                     
                     # Mostrar botones para eliminar columnas
-                    st.write("Haz clic en una columna para eliminarla:")
+                    st.write("Haz clic en una columna para eliminarla. Puedes seleccionar columnas en la tabla para remarcarlas aquí.")
                     cols_to_show = [c for c in current_gdf.columns if c != 'geometry']
+                    
+                    table_key = f"table_{geom_selected}"
+                    selected_cols_in_table = []
+                    if table_key in st.session_state:
+                        selection_data = st.session_state[table_key].get("selection", {})
+                        if isinstance(selection_data, dict):
+                            selected_cols_in_table = selection_data.get("columns", [])
                     
                     if cols_to_show:
                         # Add a "Restore All" button
@@ -219,7 +226,8 @@ def main():
                             btn_cols = st.columns(chunk_size)
                             for idx, col_name in enumerate(chunk):
                                 with btn_cols[idx]:
-                                    if st.button(f"{col_name}  ✖", key=f"drop_btn_{geom_selected}_{col_name}", use_container_width=True):
+                                    btn_type = "primary" if col_name in selected_cols_in_table else "secondary"
+                                    if st.button(f"{col_name}  ✖", key=f"drop_btn_{geom_selected}_{col_name}", type=btn_type, use_container_width=True):
                                         st.session_state[f"dropped_cols_{geom_selected}"].append(col_name)
                                         if hasattr(st, "rerun"):
                                             st.rerun()
@@ -229,26 +237,15 @@ def main():
                     # Mostrar DataFrame excluyendo o formateando la columna geometry
                     df_view = pd.DataFrame(display_gdf.drop(columns=['geometry'], errors='ignore'))
                     
-                    event = st.dataframe(
+                    table_key = f"table_{geom_selected}"
+                    st.dataframe(
                         df_view, 
                         width='stretch', 
                         height=350,
                         on_select="rerun",
-                        selection_mode="multi-column"
+                        selection_mode="multi-column",
+                        key=table_key
                     )
-                    
-                    # Si el usuario hace clic en el encabezado de una columna en la tabla
-                    if event and hasattr(event, "selection") and event.selection.get("columns"):
-                        added = False
-                        for col in event.selection["columns"]:
-                            if col not in st.session_state[f"dropped_cols_{geom_selected}"]:
-                                st.session_state[f"dropped_cols_{geom_selected}"].append(col)
-                                added = True
-                        if added:
-                            if hasattr(st, "rerun"):
-                                st.rerun()
-                            else:
-                                st.experimental_rerun()
 
         # Tab 2: Mapa Interactivo (Folium)
         with tab_map:
