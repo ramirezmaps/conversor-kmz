@@ -109,10 +109,19 @@ def gis_to_kmz():
         for gdf in gdfs.values():
             all_cols.update([c for c in gdf.columns if c != 'geometry'])
         
+        all_cols_sorted = sorted(list(all_cols))
+        
         group_by_col = st.selectbox(
             "📁 Agrupar elementos en carpetas por la columna:",
-            options=["Ninguna"] + sorted(list(all_cols)),
+            options=["Ninguna"] + all_cols_sorted,
             index=0
+        )
+        
+        popup_cols = st.multiselect(
+            "💬 Selecciona los campos a mostrar en los Popups:",
+            options=all_cols_sorted,
+            default=all_cols_sorted,
+            help="Solo las columnas que elijas aquí se mostrarán en la tabla interactiva de Google Earth."
         )
         
         if st.button("Generar KMZ", type="primary"):
@@ -120,7 +129,7 @@ def gis_to_kmz():
                 from kmz_generator import export_to_premium_kmz
                 col = group_by_col if group_by_col != "Ninguna" else None
                 try:
-                    kmz_bytes = export_to_premium_kmz(gdfs, group_by_col=col)
+                    kmz_bytes = export_to_premium_kmz(gdfs, group_by_col=col, popup_cols=popup_cols)
                     
                     st.download_button(
                         label="⬇️ Descargar KMZ",

@@ -5,10 +5,12 @@ import simplekml
 import pandas as pd
 from shapely.geometry import Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon
 
-def generate_html_table(row):
+def generate_html_table(row, allowed_cols=None):
     """Genera una tabla HTML atractiva para el popup del KML a partir de un dict (row)"""
     html = '<table style="width:100%; border-collapse: collapse; font-family: sans-serif;">'
     for k, v in row.items():
+        if allowed_cols is not None and k not in allowed_cols:
+            continue
         if k != 'geometry' and pd.notna(v) and str(v).strip():
             html += f'''
             <tr>
@@ -57,7 +59,7 @@ def _add_geometry_to_kml(container, geom, name, description, style=None):
         for i, part in enumerate(geom.geoms):
             _add_geometry_to_kml(container, part, f"{name}_{i}", description, style)
 
-def export_to_premium_kmz(gdfs_dict, group_by_col=None):
+def export_to_premium_kmz(gdfs_dict, group_by_col=None, popup_cols=None):
     """
     Toma un diccionario de GeoDataFrames y genera un archivo KMZ en memoria.
     Agrupa los elementos en carpetas si se provee group_by_col.
@@ -112,7 +114,7 @@ def export_to_premium_kmz(gdfs_dict, group_by_col=None):
                 
                 for idx, row in group_gdf.iterrows():
                     geom = row['geometry']
-                    desc = generate_html_table(row)
+                    desc = generate_html_table(row, allowed_cols=popup_cols)
                     name = str(row.get('Name', f"Elemento {idx}"))
                     if name == "nan" or not name.strip():
                         name = f"Elemento {idx}"
@@ -133,7 +135,7 @@ def export_to_premium_kmz(gdfs_dict, group_by_col=None):
             
             for idx, row in gdf.iterrows():
                 geom = row['geometry']
-                desc = generate_html_table(row)
+                desc = generate_html_table(row, allowed_cols=popup_cols)
                 name = str(row.get('Name', f"Elemento {idx}"))
                 if name == "nan" or not name.strip():
                     name = f"Elemento {idx}"
