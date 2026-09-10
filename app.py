@@ -49,7 +49,7 @@ st.markdown("""
 
 
 def gis_to_kmz():
-    st.markdown('<div class="main-header">🗺️ Conversor GIS a KMZ Premium</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🗺️ Conversor GIS a KMZ</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Convierte archivos <b>SHP, GDB, GeoJSON o DXF</b> a un archivo KMZ con popups HTML y estilos.</div>', unsafe_allow_html=True)
     
     st.sidebar.header("⚙️ Opciones KMZ")
@@ -88,7 +88,7 @@ def gis_to_kmz():
             index=0
         )
         
-        if st.button("Generar KMZ Premium", type="primary"):
+        if st.button("Generar KMZ", type="primary"):
             with st.spinner("Generando archivo KMZ con estilos y popups HTML..."):
                 from kmz_generator import export_to_premium_kmz
                 col = group_by_col if group_by_col != "Ninguna" else None
@@ -96,9 +96,9 @@ def gis_to_kmz():
                     kmz_bytes = export_to_premium_kmz(gdfs, group_by_col=col)
                     
                     st.download_button(
-                        label="⬇️ Descargar KMZ Premium",
+                        label="⬇️ Descargar KMZ",
                         data=kmz_bytes,
-                        file_name=f"{os.path.splitext(filename)[0]}_Premium.kmz",
+                        file_name=f"{os.path.splitext(filename)[0]}.kmz",
                         mime="application/vnd.google-earth.kmz",
                         key="btn_premium_kmz"
                     )
@@ -109,7 +109,7 @@ def gis_to_kmz():
         st.markdown("### 🌟 Características de este módulo")
         cols = st.columns(3)
         cols[0].info("**1. 📁 Multi-formato**\n\nSube Shapefiles o GDBs comprimidos en un `.zip`, o archivos `.geojson` y `.dxf` sueltos de manera directa.")
-        cols[1].info("**2. 🎨 Estilos Premium**\n\nEl motor asignará colores armónicos y transparencias automáticas a tus polígonos y líneas.")
+        cols[1].info("**2. 🎨 Estilos Automáticos**\n\nEl motor asignará colores armónicos y transparencias automáticas a tus polígonos y líneas.")
         cols[2].info("**3. 📊 Popups HTML**\n\nTodos tus atributos tabulares se transformarán en hermosas tablas interactivas dentro de Google Earth.")
 
 def kmz_to_gis():
@@ -515,7 +515,7 @@ def main():
     st.sidebar.markdown("### 🎛️ Navegación Principal")
     modo = st.sidebar.segmented_control(
         "Elige el módulo:",
-        options=["KMZ/KML a GIS", "GIS a KMZ Premium"],
+        options=["KMZ/KML a GIS", "GIS a KMZ"],
         default="KMZ/KML a GIS",
         selection_mode="single"
     )
