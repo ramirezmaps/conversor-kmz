@@ -6,19 +6,20 @@ import pandas as pd
 from shapely.geometry import Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon
 
 def generate_html_table(row, allowed_cols=None):
-    """Genera una tabla HTML atractiva para el popup del KML a partir de un dict (row)"""
-    html = '<table style="width:100%; border-collapse: collapse; font-family: sans-serif;">'
+    """Genera una tabla HTML minimalista para el popup del KML a partir de un dict (row)"""
+    html = '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #333;">'
+    html += '<table style="width:100%; border-collapse: collapse;">'
     for k, v in row.items():
         if allowed_cols is not None and k not in allowed_cols:
             continue
         if k != 'geometry' and pd.notna(v) and str(v).strip():
             html += f'''
             <tr>
-                <td style="padding: 5px; border-bottom: 1px solid #ddd; font-weight: bold; background-color: #f2f2f2;">{k}</td>
-                <td style="padding: 5px; border-bottom: 1px solid #ddd;">{v}</td>
+                <td style="padding: 6px 4px; border-bottom: 1px solid #eaeaea; color: #666; font-weight: 500; width: 40%;">{k}</td>
+                <td style="padding: 6px 4px; border-bottom: 1px solid #eaeaea; color: #111;">{v}</td>
             </tr>
             '''
-    html += '</table>'
+    html += '</table></div>'
     return html
 
 def _add_geometry_to_kml(container, geom, name, description, style=None):

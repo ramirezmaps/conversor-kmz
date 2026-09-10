@@ -124,6 +124,25 @@ def gis_to_kmz():
             help="Solo las columnas que elijas aquí se mostrarán en la tabla interactiva de Google Earth."
         )
         
+        st.markdown("##### 👁️ Previsualización del Popup (Estilo Minimalista)")
+        preview_row = {}
+        for layer_name, gdf in gdfs.items():
+            if not gdf.empty:
+                preview_row = gdf.iloc[0].to_dict()
+                break
+                
+        if preview_row:
+            from kmz_generator import generate_html_table
+            preview_html = generate_html_table(preview_row, allowed_cols=popup_cols)
+            st.markdown(
+                f"""
+                <div style="border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; background-color: #ffffff; max-width: 450px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); margin-bottom: 20px;">
+                    {preview_html}
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+        
         if st.button("Generar KMZ", type="primary"):
             with st.spinner("Generando archivo KMZ con estilos y popups HTML..."):
                 from kmz_generator import export_to_premium_kmz
