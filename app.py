@@ -58,7 +58,7 @@ def main():
     export_format = st.sidebar.selectbox(
         "Formato de Salida",
         options=["Shapefile (.zip)", "File Geodatabase (.gdb en .zip)", "Ambos (SHP + GDB)"],
-        index=0
+        index=2
     )
 
     sanitize_cols = st.sidebar.checkbox(
