@@ -104,6 +104,13 @@ def gis_to_kmz():
                     )
                 except Exception as e:
                     st.error(f"Error generando KMZ: {e}")
+    else:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown("### 🌟 Características de este módulo")
+        cols = st.columns(3)
+        cols[0].info("**1. 📁 Multi-formato**\n\nSube Shapefiles o GDBs comprimidos en un `.zip`, o archivos `.geojson` y `.dxf` sueltos de manera directa.")
+        cols[1].info("**2. 🎨 Estilos Premium**\n\nEl motor asignará colores armónicos y transparencias automáticas a tus polígonos y líneas.")
+        cols[2].info("**3. 📊 Popups HTML**\n\nTodos tus atributos tabulares se transformarán en hermosas tablas interactivas dentro de Google Earth.")
 
 def kmz_to_gis():
     st.markdown('<div class="main-header">🗺️ Conversor KMZ/KML a SHP & File Geodatabase (GDB)</div>', unsafe_allow_html=True)
@@ -496,6 +503,13 @@ def kmz_to_gis():
                         mime="application/zip",
                         key="btn_geojson"
                     )
+    else:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown("### ✨ ¿Cómo funciona este módulo?")
+        cols = st.columns(3)
+        cols[0].info("**1. 📍 Extracción Inteligente**\n\nSube un archivo `.kmz` o `.kml` y el sistema extraerá Puntos, Líneas y Polígonos de forma separada automáticamente.")
+        cols[1].info("**2. 🧹 Limpieza de Datos**\n\nConvierte las confusas tablas de texto HTML de los popups de Google Earth en columnas perfectamente estructuradas.")
+        cols[2].info("**3. 💽 Formatos Profesionales**\n\nExporta la información resultante a Shapefile, GeoJSON o File Geodatabase listos para usar en ArcGIS o QGIS.")
 
 def main():
     st.sidebar.markdown("### 🎛️ Navegación Principal")
