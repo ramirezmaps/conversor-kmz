@@ -139,6 +139,26 @@ def main():
 
         st.markdown("---")
 
+        # Limpieza de atributos (eliminar basura)
+        st.subheader("🧹 Limpieza de Atributos")
+        all_cols = set()
+        for gdf in gdfs.values():
+            all_cols.update([c for c in gdf.columns if c != 'geometry'])
+        
+        cols_to_drop = st.multiselect(
+            "Selecciona los campos que deseas ELIMINAR (se borrarán de todas las capas):",
+            options=sorted(list(all_cols)),
+            help="Estos campos se omitirán en la previsualización y no se exportarán a los archivos finales (útil para quitar basura)."
+        )
+
+        if cols_to_drop:
+            for layer_name in gdfs:
+                cols_present = [c for c in cols_to_drop if c in gdfs[layer_name].columns]
+                if cols_present:
+                    gdfs[layer_name] = gdfs[layer_name].drop(columns=cols_present)
+
+        st.markdown("---")
+
         # Pestañas principales
         tab_tables, tab_map, tab_download = st.tabs([
             "📊 Previsualización de Atributos",
