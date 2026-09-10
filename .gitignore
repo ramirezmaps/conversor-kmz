@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.venv/
+venv/
+ENV/
+env/
+.idea/
+.vscode/
+*.zip
+*.gdb
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
