@@ -119,6 +119,17 @@ def main():
         # Generar GeoDataFrames
         gdfs = features_to_geodataframes(features, target_crs=target_crs)
 
+        # Aplicar eliminación de columnas desde session_state
+        for layer_name in ["Puntos", "Lineas", "Poligonos"]:
+            state_key = f"dropped_cols_{layer_name}"
+            if state_key not in st.session_state:
+                st.session_state[state_key] = []
+            
+            cols_to_drop = st.session_state[state_key]
+            if cols_to_drop and not gdfs[layer_name].empty:
+                existing_cols_to_drop = [c for c in cols_to_drop if c in gdfs[layer_name].columns]
+                gdfs[layer_name] = gdfs[layer_name].drop(columns=existing_cols_to_drop)
+
         pts_count = len(gdfs['Puntos'])
         lines_count = len(gdfs['Lineas'])
         poly_count = len(gdfs['Poligonos'])
@@ -155,29 +166,6 @@ def main():
             table_container = st.container()
 
             st.markdown("---")
-            # Limpieza de atributos (eliminar basura)
-            st.subheader("🧹 Limpieza de Atributos por Capa")
-            st.write("Selecciona los campos que deseas **ELIMINAR** para cada tipo de geometría. Estos no se exportarán.")
-            
-            col_pts, col_lin, col_pol = st.columns(3)
-            cols_containers = {"Puntos": col_pts, "Lineas": col_lin, "Poligonos": col_pol}
-            
-            for layer_name in ["Puntos", "Lineas", "Poligonos"]:
-                gdf = gdfs[layer_name]
-                with cols_containers[layer_name]:
-                    if not gdf.empty:
-                        layer_cols = sorted([c for c in gdf.columns if c != 'geometry'])
-                        cols_to_drop = st.multiselect(
-                            f"🗑️ Quitar de {layer_name}:",
-                            options=layer_cols,
-                            key=f"drop_{layer_name}"
-                        )
-                        if cols_to_drop:
-                            gdfs[layer_name] = gdf.drop(columns=cols_to_drop)
-                    else:
-                        st.info(f"{layer_name}: Sin datos")
-
-            st.markdown("---")
             st.markdown("##### 🔍 Inspeccionar Popup HTML Crudo de una Entidad")
             feature_names = [f"{i+1}: {f.get('name') or 'Sin Nombre'}" for i, f in enumerate(features)]
             selected_idx = st.selectbox("Selecciona un elemento para ver su popup HTML original:", range(len(features)), format_func=lambda i: feature_names[i])
@@ -209,6 +197,34 @@ def main():
 
                     st.markdown(f"**Capa `{geom_selected_label}` ({len(display_gdf)} registros, {len(display_gdf.columns) - 1} atributos)**")
                     
+                    # Mostrar botones para eliminar columnas
+                    st.write("Haz clic en una columna para eliminarla:")
+                    cols_to_show = [c for c in current_gdf.columns if c != 'geometry']
+                    
+                    if cols_to_show:
+                        # Add a "Restore All" button
+                        if st.session_state[f"dropped_cols_{geom_selected}"]:
+                            if st.button("🔄 Restaurar columnas eliminadas", key=f"restore_{geom_selected}"):
+                                st.session_state[f"dropped_cols_{geom_selected}"] = []
+                                if hasattr(st, "rerun"):
+                                    st.rerun()
+                                else:
+                                    st.experimental_rerun()
+
+                        # Layout in chunks to create a row of buttons
+                        chunk_size = 6
+                        for i in range(0, len(cols_to_show), chunk_size):
+                            chunk = cols_to_show[i:i+chunk_size]
+                            btn_cols = st.columns(len(chunk))
+                            for idx, col_name in enumerate(chunk):
+                                with btn_cols[idx]:
+                                    if st.button(f"{col_name}  ✖", key=f"drop_btn_{geom_selected}_{col_name}"):
+                                        st.session_state[f"dropped_cols_{geom_selected}"].append(col_name)
+                                        if hasattr(st, "rerun"):
+                                            st.rerun()
+                                        else:
+                                            st.experimental_rerun()
+                                            
                     # Mostrar DataFrame excluyendo o formateando la columna geometry
                     df_view = pd.DataFrame(display_gdf.drop(columns=['geometry'], errors='ignore'))
                     st.dataframe(df_view, width='stretch', height=350)
