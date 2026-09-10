@@ -139,30 +139,6 @@ def main():
 
         st.markdown("---")
 
-        # Limpieza de atributos (eliminar basura)
-        st.subheader("🧹 Limpieza de Atributos por Capa")
-        st.write("Selecciona los campos que deseas **ELIMINAR** para cada tipo de geometría. Estos no se exportarán.")
-        
-        col_pts, col_lin, col_pol = st.columns(3)
-        cols_containers = {"Puntos": col_pts, "Lineas": col_lin, "Poligonos": col_pol}
-        
-        for layer_name in ["Puntos", "Lineas", "Poligonos"]:
-            gdf = gdfs[layer_name]
-            with cols_containers[layer_name]:
-                if not gdf.empty:
-                    layer_cols = sorted([c for c in gdf.columns if c != 'geometry'])
-                    cols_to_drop = st.multiselect(
-                        f"🗑️ Quitar de {layer_name}:",
-                        options=layer_cols,
-                        key=f"drop_{layer_name}"
-                    )
-                    if cols_to_drop:
-                        gdfs[layer_name] = gdf.drop(columns=cols_to_drop)
-                else:
-                    st.info(f"{layer_name}: Sin datos")
-
-        st.markdown("---")
-
         # Pestañas principales
         tab_tables, tab_map, tab_download = st.tabs([
             "📊 Previsualización de Atributos",
@@ -175,39 +151,67 @@ def main():
             st.subheader("Atributos Extraídos por Tipo de Geometría")
             st.info("Los popups HTML en la descripción del KMZ fueron transformados automáticamente en las siguientes columnas de atributos:")
 
-            geom_selected_label = st.radio(
-                "Selecciona la capa a visualizar:",
-                options=["Puntos", "Líneas", "Polígonos"],
-                horizontal=True
-            )
+            # Contenedor para la tabla, se renderiza visualmente aquí pero lo llenamos después
+            table_container = st.container()
 
-            geom_map = {"Puntos": "Puntos", "Líneas": "Lineas", "Polígonos": "Poligonos"}
-            geom_selected = geom_map[geom_selected_label]
+            st.markdown("---")
+            # Limpieza de atributos (eliminar basura)
+            st.subheader("🧹 Limpieza de Atributos por Capa")
+            st.write("Selecciona los campos que deseas **ELIMINAR** para cada tipo de geometría. Estos no se exportarán.")
+            
+            col_pts, col_lin, col_pol = st.columns(3)
+            cols_containers = {"Puntos": col_pts, "Lineas": col_lin, "Poligonos": col_pol}
+            
+            for layer_name in ["Puntos", "Lineas", "Poligonos"]:
+                gdf = gdfs[layer_name]
+                with cols_containers[layer_name]:
+                    if not gdf.empty:
+                        layer_cols = sorted([c for c in gdf.columns if c != 'geometry'])
+                        cols_to_drop = st.multiselect(
+                            f"🗑️ Quitar de {layer_name}:",
+                            options=layer_cols,
+                            key=f"drop_{layer_name}"
+                        )
+                        if cols_to_drop:
+                            gdfs[layer_name] = gdf.drop(columns=cols_to_drop)
+                    else:
+                        st.info(f"{layer_name}: Sin datos")
 
-            current_gdf = gdfs[geom_selected]
+            st.markdown("---")
+            st.markdown("##### 🔍 Inspeccionar Popup HTML Crudo de una Entidad")
+            feature_names = [f"{i+1}: {f.get('name') or 'Sin Nombre'}" for i, f in enumerate(features)]
+            selected_idx = st.selectbox("Selecciona un elemento para ver su popup HTML original:", range(len(features)), format_func=lambda i: feature_names[i])
+            
+            selected_feat = features[selected_idx]
+            with st.expander("Ver contenido HTML crudo y atributos parseados"):
+                st.json(selected_feat.get('attributes', {}))
+                st.code(selected_feat.get('description_raw', 'Sin descripción HTML'), language="html")
 
-            if current_gdf.empty:
-                st.warning(f"No se encontraron elementos de tipo {geom_selected_label} en el archivo KMZ.")
-            else:
-                display_gdf = current_gdf.copy()
-                if sanitize_cols:
-                    display_gdf = sanitize_dataframe_columns(display_gdf, max_len=max_dbf_len)
+            # Ahora sí llenamos la tabla con los datos ya filtrados por el usuario
+            with table_container:
+                geom_selected_label = st.radio(
+                    "Selecciona la capa a visualizar:",
+                    options=["Puntos", "Líneas", "Polígonos"],
+                    horizontal=True
+                )
 
-                st.markdown(f"**Capa `{geom_selected_label}` ({len(display_gdf)} registros, {len(display_gdf.columns) - 1} atributos)**")
-                
-                # Mostrar DataFrame excluyendo o formateando la columna geometry
-                df_view = pd.DataFrame(display_gdf.drop(columns=['geometry'], errors='ignore'))
-                st.dataframe(df_view, width='stretch', height=350)
+                geom_map = {"Puntos": "Puntos", "Líneas": "Lineas", "Polígonos": "Poligonos"}
+                geom_selected = geom_map[geom_selected_label]
 
-                # Inspección individual de Popup original
-                st.markdown("##### 🔍 Inspeccionar Popup HTML Crudo de una Entidad")
-                feature_names = [f"{i+1}: {f.get('name') or 'Sin Nombre'}" for i, f in enumerate(features)]
-                selected_idx = st.selectbox("Selecciona un elemento para ver su popup HTML original:", range(len(features)), format_func=lambda i: feature_names[i])
-                
-                selected_feat = features[selected_idx]
-                with st.expander("Ver contenido HTML crudo y atributos parseados"):
-                    st.json(selected_feat.get('attributes', {}))
-                    st.code(selected_feat.get('description_raw', 'Sin descripción HTML'), language="html")
+                current_gdf = gdfs[geom_selected]
+
+                if current_gdf.empty:
+                    st.warning(f"No se encontraron elementos de tipo {geom_selected_label} en el archivo KMZ.")
+                else:
+                    display_gdf = current_gdf.copy()
+                    if sanitize_cols:
+                        display_gdf = sanitize_dataframe_columns(display_gdf, max_len=max_dbf_len)
+
+                    st.markdown(f"**Capa `{geom_selected_label}` ({len(display_gdf)} registros, {len(display_gdf.columns) - 1} atributos)**")
+                    
+                    # Mostrar DataFrame excluyendo o formateando la columna geometry
+                    df_view = pd.DataFrame(display_gdf.drop(columns=['geometry'], errors='ignore'))
+                    st.dataframe(df_view, width='stretch', height=350)
 
         # Tab 2: Mapa Interactivo (Folium)
         with tab_map:
