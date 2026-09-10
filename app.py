@@ -233,9 +233,19 @@ def main():
                 maxy = max(b[3] for b in bounds_list)
                 center_lat = (miny + maxy) / 2
                 center_lon = (minx + maxx) / 2
-                m = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB positron")
+                m = folium.Map(
+                    location=[center_lat, center_lon], 
+                    zoom_start=12, 
+                    tiles='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                    attr='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+                )
             else:
-                m = folium.Map(location=[0, 0], zoom_start=2, tiles="CartoDB positron")
+                m = folium.Map(
+                    location=[0, 0], 
+                    zoom_start=2, 
+                    tiles='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                    attr='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+                )
 
             colors = {'Puntos': 'red', 'Lineas': 'blue', 'Poligonos': 'green'}
 
