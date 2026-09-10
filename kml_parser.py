@@ -258,8 +258,10 @@ def parse_kml_content(kml_content):
         # Usar lxml con recover=True para ignorar errores de XML malformado como "unbound prefix" (ej: gx:)
         parser = etree.XMLParser(recover=True)
         root = etree.fromstring(kml_content.encode('utf-8', errors='ignore'), parser=parser)
-    except ImportError:
-        # Fallback agresivo si lxml no está disponible
+    except Exception as e:
+        print(f"lxml parser failed: {e}. Trying aggressive fallback.")
+        # Fallback agresivo si lxml falla o no está disponible
+        kml_content = re.sub(r'\s+xmlns(:\w+)?="[^"]*"', '', kml_content)
         kml_content = re.sub(r'(<\/?)[a-zA-Z0-9_-]+:', r'\1', kml_content)
         root = ET.fromstring(kml_content)
         
