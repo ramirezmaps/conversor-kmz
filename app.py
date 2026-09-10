@@ -124,82 +124,151 @@ def gis_to_kmz():
             help="Solo las columnas que elijas aquí se mostrarán en la tabla interactiva de Google Earth."
         )
         
-        st.markdown("##### 👁️ Previsualización del Popup (Estilo Minimalista)")
-        preview_row = {}
-        for layer_name, gdf in gdfs.items():
-            if not gdf.empty:
-                preview_row = gdf.iloc[0].to_dict()
-                break
-                
-        if preview_row:
-            from kmz_generator import generate_html_table
-            preview_html = generate_html_table(preview_row, allowed_cols=popup_cols)
-            st.markdown(
-                f"""
-                <div style="border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; background-color: #ffffff; max-width: 450px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); margin-bottom: 20px;">
-                    {preview_html}
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
+        st.markdown("---")
+        st.subheader("🗺️ Mapa Interactivo de Previsualización")
         
-        st.markdown("##### 🗺️ Mapa de Previsualización")
-        with st.expander("Ver mapa interactivo (Muestra hasta 500 elementos por capa para mejor rendimiento)", expanded=False):
-            st.write("Haz clic en las geometrías en el mapa para ver cómo se desplegará tu popup.")
-            import folium
-            from streamlit_folium import st_folium
-            
-            # Convert to WGS84
-            wgs_gdfs = {}
-            for lyr, gdf in gdfs.items():
-                if not gdf.empty:
-                    if gdf.crs is None:
-                        wgs_gdfs[lyr] = gdf.set_crs("EPSG:4326")
-                    elif gdf.crs != "EPSG:4326":
-                        wgs_gdfs[lyr] = gdf.to_crs("EPSG:4326")
-                    else:
-                        wgs_gdfs[lyr] = gdf.copy()
-            
-            bounds_list = [g.total_bounds for g in wgs_gdfs.values() if not g.empty]
-            if bounds_list:
-                minx = min(b[0] for b in bounds_list)
-                miny = min(b[1] for b in bounds_list)
-                maxx = max(b[2] for b in bounds_list)
-                maxy = max(b[3] for b in bounds_list)
-                m_prev = folium.Map(location=[(miny + maxy) / 2, (minx + maxx) / 2], zoom_start=12, prefer_canvas=True)
-            else:
-                m_prev = folium.Map(location=[0, 0], zoom_start=2)
+        # Asegurar que el mapa esté en WGS84 para Folium
+        wgs_gdfs = {}
+        for lyr, gdf in gdfs.items():
+            if not gdf.empty:
+                if gdf.crs is None:
+                    wgs_gdfs[lyr] = gdf.set_crs("EPSG:4326")
+                elif gdf.crs != "EPSG:4326":
+                    wgs_gdfs[lyr] = gdf.to_crs("EPSG:4326")
+                else:
+                    wgs_gdfs[lyr] = gdf.copy()
+        
+        # Selector de Atributo para Choropleth Dinámico
+        st.markdown("##### 🎨 Coloración Automática (Choropleth)")
+        st.write("Selecciona una columna para colorear los elementos geográficos automáticamente según sus valores.")
+        
+        color_by_col_prev = st.selectbox(
+            "Colorear según...",
+            options=["Ninguno (Color por defecto)"] + all_cols_sorted,
+            index=0,
+            key="color_by_col_prev"
+        )
+        
+        # Calcular centro del mapa
+        bounds_list = []
+        for gdf_layer in wgs_gdfs.values():
+            if not gdf_layer.empty:
+                bounds_list.append(gdf_layer.total_bounds)
+
+        if bounds_list:
+            minx = min(b[0] for b in bounds_list)
+            miny = min(b[1] for b in bounds_list)
+            maxx = max(b[2] for b in bounds_list)
+            maxy = max(b[3] for b in bounds_list)
+            center_lat = (miny + maxy) / 2
+            center_lon = (minx + maxx) / 2
+            m = folium.Map(
+                location=[center_lat, center_lon], 
+                zoom_start=12, 
+                tiles='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                attr='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+                prefer_canvas=True
+            )
+        else:
+            m = folium.Map(
+                location=[0, 0], 
+                zoom_start=2, 
+                tiles='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                attr='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+                prefer_canvas=True
+            )
+
+        default_colors = {'Puntos': 'red', 'Lineas': 'blue', 'Poligonos': 'green'}
+        
+        import branca.colormap as cm
+        import numpy as np
+
+        for layer_name, gdf_layer in wgs_gdfs.items():
+            if gdf_layer.empty:
+                continue
+
+            feature_group = folium.FeatureGroup(name=f"{layer_name} ({len(gdf_layer)})")
+
+            # Generar el estilo dinámicamente si se eligió un atributo
+            style_function = None
+            if color_by_col_prev != "Ninguno (Color por defecto)" and color_by_col_prev in gdf_layer.columns:
+                # Encontrar valores unicos
+                unique_vals = gdf_layer[color_by_col_prev].astype(str).unique()
                 
-            colors = {'Puntos': '#e6194b', 'Lineas': '#3cb44b', 'Poligonos': '#4363d8'}
-            
-            for layer_name, gdf_layer in wgs_gdfs.items():
-                if gdf_layer.empty:
-                    continue
-                fg = folium.FeatureGroup(name=f"{layer_name} ({len(gdf_layer)})")
-                color = colors.get(layer_name, "#911eb4")
+                # Crear una paleta de colores
+                is_numeric = pd.api.types.is_numeric_dtype(gdf_layer[color_by_col_prev])
                 
-                # Iterate over top 500 features to keep map responsive
-                for idx, row in gdf_layer.head(500).iterrows():
-                    geom = row['geometry']
-                    if geom is None or geom.is_empty:
-                        continue
-                        
-                    # Generate identical HTML to the KMZ
-                    desc = generate_html_table(row.to_dict(), allowed_cols=popup_cols)
-                    popup = folium.Popup(folium.Html(desc, script=True), max_width=450)
+                if is_numeric and len(unique_vals) > 5:
+                    vmin, vmax = gdf_layer[color_by_col_prev].min(), gdf_layer[color_by_col_prev].max()
+                    colormap = cm.LinearColormap(colors=['blue', 'yellow', 'red'], vmin=vmin, vmax=vmax)
+                    m.add_child(colormap)
+                    def create_style(feature):
+                        val = feature['properties'].get(color_by_col_prev)
+                        color = colormap(val) if val is not None else default_colors.get(layer_name, 'purple')
+                        return {'fillColor': color, 'color': color, 'weight': 2, 'fillOpacity': 0.6}
+                    style_function = create_style
+                else:
+                    # Categórico
+                    palette = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000']
+                    val_to_color = {val: palette[i % len(palette)] for i, val in enumerate(unique_vals)}
                     
-                    if geom.geom_type == 'Point':
-                        folium.CircleMarker(
-                            location=[geom.y, geom.x], radius=5, color=color, fill=True, fill_opacity=0.6, popup=popup
-                        ).add_to(fg)
-                    elif geom.geom_type in ['LineString', 'MultiLineString']:
-                        folium.GeoJson(geom, style_function=lambda x, c=color: {'color': c, 'weight': 2}, popup=popup).add_to(fg)
-                    elif geom.geom_type in ['Polygon', 'MultiPolygon']:
-                        folium.GeoJson(geom, style_function=lambda x, c=color: {'color': c, 'fillColor': c, 'weight': 1, 'fillOpacity': 0.4}, popup=popup).add_to(fg)
-                fg.add_to(m_prev)
-                
-            folium.LayerControl().add_to(m_prev)
-            st_folium(m_prev, width=1000, height=450, returned_objects=[])
+                    def create_style(feature):
+                        val = str(feature['properties'].get(color_by_col_prev))
+                        color = val_to_color.get(val, default_colors.get(layer_name, 'purple'))
+                        return {'fillColor': color, 'color': color, 'weight': 2, 'fillOpacity': 0.6}
+                    style_function = create_style
+            else:
+                # Color por defecto según geometría
+                def create_style(feature, lyr_name=layer_name):
+                    color = default_colors.get(lyr_name, 'purple')
+                    return {'fillColor': color, 'color': color, 'weight': 2, 'fillOpacity': 0.5}
+                style_function = create_style
+
+            # Convertir fechas a strings para que JSON serialice correctamente
+            for col in gdf_layer.columns:
+                if pd.api.types.is_datetime64_any_dtype(gdf_layer[col]):
+                    gdf_layer[col] = gdf_layer[col].astype(str)
+
+            # Usar los campos que el usuario seleccionó en los popups de la interfaz (Folium GeoJsonPopup)
+            fields_to_show = [c for c in popup_cols if c in gdf_layer.columns]
+            popup = folium.GeoJsonPopup(
+                fields=fields_to_show,
+                aliases=fields_to_show,
+                localize=True,
+                max_width=300
+            ) if fields_to_show else None
+            
+            tooltip_fields = fields_to_show[:3]
+            tooltip = folium.GeoJsonTooltip(
+                fields=tooltip_fields,
+                aliases=tooltip_fields
+            ) if tooltip_fields else None
+
+            # Limitar número de características por capa para no colapsar el navegador
+            display_gdf = gdf_layer.head(2000)
+
+            if layer_name == 'Puntos':
+                folium.GeoJson(
+                    display_gdf,
+                    name=layer_name,
+                    style_function=style_function,
+                    marker=folium.CircleMarker(radius=5, fill=True, fill_opacity=0.8),
+                    popup=popup,
+                    tooltip=tooltip
+                ).add_to(feature_group)
+            else:
+                folium.GeoJson(
+                    display_gdf,
+                    name=layer_name,
+                    style_function=style_function,
+                    popup=popup,
+                    tooltip=tooltip
+                ).add_to(feature_group)
+
+            feature_group.add_to(m)
+
+        folium.LayerControl().add_to(m)
+        st_folium(m, width=1200, height=500, returned_objects=[])
         
         st.markdown("---")
         
