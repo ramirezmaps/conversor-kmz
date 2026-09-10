@@ -140,22 +140,26 @@ def main():
         st.markdown("---")
 
         # Limpieza de atributos (eliminar basura)
-        st.subheader("🧹 Limpieza de Atributos")
-        all_cols = set()
-        for gdf in gdfs.values():
-            all_cols.update([c for c in gdf.columns if c != 'geometry'])
+        st.subheader("🧹 Limpieza de Atributos por Capa")
+        st.write("Selecciona los campos que deseas **ELIMINAR** para cada tipo de geometría. Estos no se exportarán.")
         
-        cols_to_drop = st.multiselect(
-            "Selecciona los campos que deseas ELIMINAR (se borrarán de todas las capas):",
-            options=sorted(list(all_cols)),
-            help="Estos campos se omitirán en la previsualización y no se exportarán a los archivos finales (útil para quitar basura)."
-        )
-
-        if cols_to_drop:
-            for layer_name in gdfs:
-                cols_present = [c for c in cols_to_drop if c in gdfs[layer_name].columns]
-                if cols_present:
-                    gdfs[layer_name] = gdfs[layer_name].drop(columns=cols_present)
+        col_pts, col_lin, col_pol = st.columns(3)
+        cols_containers = {"Puntos": col_pts, "Lineas": col_lin, "Poligonos": col_pol}
+        
+        for layer_name in ["Puntos", "Lineas", "Poligonos"]:
+            gdf = gdfs[layer_name]
+            with cols_containers[layer_name]:
+                if not gdf.empty:
+                    layer_cols = sorted([c for c in gdf.columns if c != 'geometry'])
+                    cols_to_drop = st.multiselect(
+                        f"🗑️ Quitar de {layer_name}:",
+                        options=layer_cols,
+                        key=f"drop_{layer_name}"
+                    )
+                    if cols_to_drop:
+                        gdfs[layer_name] = gdf.drop(columns=cols_to_drop)
+                else:
+                    st.info(f"{layer_name}: Sin datos")
 
         st.markdown("---")
 
