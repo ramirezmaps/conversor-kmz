@@ -498,11 +498,17 @@ def kmz_to_gis():
                     )
 
 def main():
-    st.sidebar.title("Navegación")
-    modo = st.sidebar.radio(
+    st.sidebar.markdown("### 🎛️ Navegación Principal")
+    modo = st.sidebar.segmented_control(
         "Elige el módulo:",
-        ["KMZ/KML a GIS", "GIS a KMZ Premium"]
+        options=["KMZ/KML a GIS", "GIS a KMZ Premium"],
+        default="KMZ/KML a GIS",
+        selection_mode="single"
     )
+    
+    if not modo:
+        modo = "KMZ/KML a GIS"
+        
     st.sidebar.markdown("---")
     
     if modo == "KMZ/KML a GIS":
