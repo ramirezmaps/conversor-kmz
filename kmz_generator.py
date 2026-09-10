@@ -69,9 +69,12 @@ def export_to_premium_kmz(gdfs_dict, group_by_col=None):
     # Por ahora, usamos un estilo premium genérico para todo si no hay agrupacion
     # Si hay agrupación o multiples capas, idealmente asignar colores
     
-    import branca.colormap as cm
-    import matplotlib.colors as mcolors
-    palette = list(mcolors.TABLEAU_COLORS.values())
+    # Paleta de colores premium (estilo Tableau/Material)
+    palette = [
+        '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
+        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+        '#393b79', '#637939', '#8c6d31', '#843c39', '#7b4173'
+    ]
     color_idx = 0
     
     # Para cada capa en el diccionario
