@@ -215,10 +215,11 @@ def main():
                         chunk_size = 6
                         for i in range(0, len(cols_to_show), chunk_size):
                             chunk = cols_to_show[i:i+chunk_size]
-                            btn_cols = st.columns(len(chunk))
+                            # Crear siempre 6 columnas para que el ancho sea uniforme y no se dispersen
+                            btn_cols = st.columns(chunk_size)
                             for idx, col_name in enumerate(chunk):
                                 with btn_cols[idx]:
-                                    if st.button(f"{col_name}  ✖", key=f"drop_btn_{geom_selected}_{col_name}"):
+                                    if st.button(f"{col_name}  ✖", key=f"drop_btn_{geom_selected}_{col_name}", use_container_width=True):
                                         st.session_state[f"dropped_cols_{geom_selected}"].append(col_name)
                                         if hasattr(st, "rerun"):
                                             st.rerun()
