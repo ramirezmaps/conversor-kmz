@@ -14,7 +14,7 @@ from streamlit_folium import st_folium
 import zipfile
 
 from kml_parser import load_kmz_or_kml
-from exporter import features_to_geodataframes, export_to_shp_zip, export_to_gdb_zip, sanitize_dataframe_columns
+from exporter import features_to_geodataframes, export_to_shp_zip, export_to_gdb_zip, export_to_geojson_zip, sanitize_dataframe_columns
 
 
 st.set_page_config(
@@ -57,8 +57,8 @@ def main():
 
     export_format = st.sidebar.selectbox(
         "Formato de Salida",
-        options=["Shapefile (.zip)", "File Geodatabase (.gdb en .zip)", "Ambos (SHP + GDB)"],
-        index=2
+        options=["Shapefile (.zip)", "File Geodatabase (.gdb en .zip)", "GeoJSON (.zip)", "Todos (SHP + GDB + GeoJSON)"],
+        index=3
     )
 
     sanitize_cols = st.sidebar.checkbox(
@@ -220,6 +220,22 @@ def main():
             # Asegurar que el mapa esté en WGS84 para Folium
             wgs_gdfs = features_to_geodataframes(features, target_crs="EPSG:4326")
             
+            # Selector de Atributo para Choropleth Dinámico
+            st.markdown("##### 🎨 Coloración Automática (Choropleth)")
+            st.write("Selecciona una columna para colorear los elementos geográficos automáticamente según sus valores.")
+            
+            # Recopilamos las columnas disponibles (excluyendo geometry) de todas las capas
+            all_cols = set()
+            for gdf_layer in wgs_gdfs.values():
+                all_cols.update([c for c in gdf_layer.columns if c != 'geometry'])
+            all_cols_sorted = sorted(list(all_cols))
+            
+            color_by_col = st.selectbox(
+                "Colorear según...",
+                options=["Ninguno (Color por defecto)"] + all_cols_sorted,
+                index=0
+            )
+            
             # Calcular centro del mapa
             bounds_list = []
             for gdf_layer in wgs_gdfs.values():
@@ -237,17 +253,22 @@ def main():
                     location=[center_lat, center_lon], 
                     zoom_start=12, 
                     tiles='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-                    attr='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+                    attr='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+                    prefer_canvas=True
                 )
             else:
                 m = folium.Map(
                     location=[0, 0], 
                     zoom_start=2, 
                     tiles='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-                    attr='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+                    attr='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+                    prefer_canvas=True
                 )
 
-            colors = {'Puntos': 'red', 'Lineas': 'blue', 'Poligonos': 'green'}
+            default_colors = {'Puntos': 'red', 'Lineas': 'blue', 'Poligonos': 'green'}
+            
+            import branca.colormap as cm
+            import numpy as np
 
             for layer_name, gdf_layer in wgs_gdfs.items():
                 if gdf_layer.empty:
@@ -255,79 +276,134 @@ def main():
 
                 feature_group = folium.FeatureGroup(name=f"{layer_name} ({len(gdf_layer)})")
 
-                for idx, row in gdf_layer.iterrows():
-                    geom = row['geometry']
-                    popup_html = f"<b>Nombre:</b> {row.get('Name', '')}<br><b>Capa:</b> {row.get('Folder', '')}<br><hr>"
-                    # Agregar primeros atributos
-                    for k, v in row.items():
-                        if k not in ('geometry', 'Name', 'Folder') and str(v).strip():
-                            popup_html += f"<b>{k}:</b> {v}<br>"
+                # Generar el estilo dinámicamente si se eligió un atributo
+                style_function = None
+                if color_by_col != "Ninguno (Color por defecto)" and color_by_col in gdf_layer.columns:
+                    # Encontrar valores unicos
+                    unique_vals = gdf_layer[color_by_col].astype(str).unique()
+                    
+                    # Crear una paleta de colores
+                    is_numeric = pd.api.types.is_numeric_dtype(gdf_layer[color_by_col])
+                    
+                    if is_numeric and len(unique_vals) > 5:
+                        vmin, vmax = gdf_layer[color_by_col].min(), gdf_layer[color_by_col].max()
+                        colormap = cm.LinearColormap(colors=['blue', 'yellow', 'red'], vmin=vmin, vmax=vmax)
+                        m.add_child(colormap)
+                        def create_style(feature):
+                            val = feature['properties'].get(color_by_col)
+                            color = colormap(val) if val is not None else default_colors[layer_name]
+                            return {'fillColor': color, 'color': color, 'weight': 2, 'fillOpacity': 0.6}
+                        style_function = create_style
+                    else:
+                        # Categórico
+                        palette = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000']
+                        val_to_color = {val: palette[i % len(palette)] for i, val in enumerate(unique_vals)}
+                        
+                        def create_style(feature):
+                            val = str(feature['properties'].get(color_by_col))
+                            color = val_to_color.get(val, default_colors[layer_name])
+                            return {'fillColor': color, 'color': color, 'weight': 2, 'fillOpacity': 0.6}
+                        style_function = create_style
+                else:
+                    # Color por defecto según geometría
+                    def create_style(feature, lyr_name=layer_name):
+                        color = default_colors[lyr_name]
+                        return {'fillColor': color, 'color': color, 'weight': 2, 'fillOpacity': 0.5}
+                    style_function = create_style
 
-                    popup = folium.Popup(popup_html, max_width=300)
+                # Convertir fechas a strings para que JSON serialice correctamente
+                for col in gdf_layer.columns:
+                    if pd.api.types.is_datetime64_any_dtype(gdf_layer[col]):
+                        gdf_layer[col] = gdf_layer[col].astype(str)
 
-                    if geom.geom_type == 'Point':
-                        folium.CircleMarker(
-                            location=[geom.y, geom.x],
-                            radius=6,
-                            color=colors[layer_name],
-                            fill=True,
-                            fill_color=colors[layer_name],
-                            fill_opacity=0.7,
-                            popup=popup
-                        ).add_to(feature_group)
-                    elif geom.geom_type in ('LineString', 'MultiLineString'):
-                        folium.GeoJson(
-                            geom.__geo_interface__,
-                            style_function=lambda x, color=colors[layer_name]: {'color': color, 'weight': 3},
-                            popup=popup
-                        ).add_to(feature_group)
-                    elif geom.geom_type in ('Polygon', 'MultiPolygon'):
-                        folium.GeoJson(
-                            geom.__geo_interface__,
-                            style_function=lambda x, color=colors[layer_name]: {'fillColor': color, 'color': color, 'weight': 2, 'fillOpacity': 0.4},
-                            popup=popup
-                        ).add_to(feature_group)
+                # Optimización: Agregar todos los polígonos y líneas con folium.GeoJson (bulk)
+                fields_to_show = [c for c in gdf_layer.columns if c != 'geometry']
+                popup = folium.GeoJsonPopup(
+                    fields=fields_to_show,
+                    aliases=fields_to_show,
+                    localize=True,
+                    max_width=300
+                )
+                
+                tooltip_fields = fields_to_show[:3]
+                tooltip = folium.GeoJsonTooltip(
+                    fields=tooltip_fields,
+                    aliases=tooltip_fields
+                ) if tooltip_fields else None
+
+                if layer_name == 'Puntos':
+                    # Para puntos usamos un renderizado especial
+                    folium.GeoJson(
+                        gdf_layer,
+                        name=layer_name,
+                        style_function=style_function,
+                        marker=folium.CircleMarker(radius=5, fill=True, fill_opacity=0.8),
+                        popup=popup,
+                        tooltip=tooltip
+                    ).add_to(feature_group)
+                else:
+                    folium.GeoJson(
+                        gdf_layer,
+                        name=layer_name,
+                        style_function=style_function,
+                        popup=popup,
+                        tooltip=tooltip
+                    ).add_to(feature_group)
 
                 feature_group.add_to(m)
 
             folium.LayerControl().add_to(m)
-            st_folium(m, width=1200, height=500)
+            st_folium(m, width=1200, height=500, returned_objects=[])
 
         # Tab 3: Descarga
         with tab_download:
             st.subheader("📥 Generación y Descarga de Archivos GIS")
             st.markdown("Selecciona y descarga tus archivos procesados listos para abrir en ArcGIS, QGIS o Google Earth Pro:")
 
-            col_dn1, col_dn2 = st.columns(2)
+            col_dn1, col_dn2, col_dn3 = st.columns(3)
 
             base_filename = os.path.splitext(filename)[0]
 
-            if export_format in ["Shapefile (.zip)", "Ambos (SHP + GDB)"]:
+            if export_format in ["Shapefile (.zip)", "Ambos (SHP + GDB)", "Todos (SHP + GDB + GeoJSON)"]:
                 with col_dn1:
-                    st.markdown("### 📁 ESRI Shapefile (.zip)")
-                    st.write("Genera capas Shapefile (`Puntos.shp`, `Lineas.shp`, `Poligonos.shp`) empaquetadas en un único archivo ZIP.")
+                    st.markdown("### 📁 ESRI Shapefile")
+                    st.write("Capas `SHP` empaquetadas en un único archivo ZIP.")
                     with st.spinner("Empaquetando Shapefile ZIP..."):
                         shp_zip_bytes = export_to_shp_zip(gdfs, sanitize_cols=sanitize_cols)
                     st.download_button(
-                        label="⬇️ Descargar Shapefile (.zip)",
+                        label="⬇️ Descargar Shapefile",
                         data=shp_zip_bytes,
                         file_name=f"{base_filename}_SHP.zip",
                         mime="application/zip",
                         key="btn_shp"
                     )
 
-            if export_format in ["File Geodatabase (.gdb en .zip)", "Ambos (SHP + GDB)"]:
+            if export_format in ["File Geodatabase (.gdb en .zip)", "Ambos (SHP + GDB)", "Todos (SHP + GDB + GeoJSON)"]:
                 with col_dn2:
-                    st.markdown("### 🗄️ File Geodatabase (.gdb ZIP)")
-                    st.write("Genera una File Geodatabase (`.gdb`) con Feature Classes para cada tipo de geometría empaquetada en ZIP.")
+                    st.markdown("### 🗄️ File Geodatabase")
+                    st.write("Feature Classes dentro de `.gdb` empaquetadas en ZIP.")
                     with st.spinner("Generando File Geodatabase..."):
                         gdb_zip_bytes = export_to_gdb_zip(gdfs, gdb_name=f"{base_filename}.gdb", sanitize_cols=sanitize_cols)
                     st.download_button(
-                        label="⬇️ Descargar File Geodatabase (.gdb.zip)",
+                        label="⬇️ Descargar Geodatabase",
                         data=gdb_zip_bytes,
                         file_name=f"{base_filename}_GDB.zip",
                         mime="application/zip",
                         key="btn_gdb"
+                    )
+
+            if export_format in ["GeoJSON (.zip)", "Todos (SHP + GDB + GeoJSON)"]:
+                with col_dn3:
+                    st.markdown("### 🌐 GeoJSON")
+                    st.write("Archivos GeoJSON estándar empaquetados en ZIP.")
+                    with st.spinner("Generando GeoJSON ZIP..."):
+                        geojson_zip_bytes = export_to_geojson_zip(gdfs, sanitize_cols=sanitize_cols)
+                    st.download_button(
+                        label="⬇️ Descargar GeoJSON",
+                        data=geojson_zip_bytes,
+                        file_name=f"{base_filename}_GeoJSON.zip",
+                        mime="application/zip",
+                        key="btn_geojson"
                     )
 
 if __name__ == "__main__":

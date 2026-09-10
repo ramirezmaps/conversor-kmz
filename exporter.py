@@ -198,3 +198,43 @@ def export_to_gdb_zip(gdfs, gdb_name="Convertido.gdb", sanitize_cols=True):
 
     zip_buffer.seek(0)
     return zip_buffer.getvalue()
+
+
+def export_to_geojson_zip(gdfs, sanitize_cols=True):
+    """
+    Exporta los GeoDataFrames a archivos GeoJSON (.geojson) por tipo de geometría
+    y los empaqueta en un archivo .ZIP en memoria.
+    Retorna los bytes del ZIP.
+    """
+    zip_buffer = io.BytesIO()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        for layer_name, gdf in gdfs.items():
+            if gdf.empty or len(gdf) == 0:
+                continue
+
+            gdf_export = gdf.copy()
+            if sanitize_cols:
+                # El GeoJSON no tiene limite estricto de 10 caracteres como SHP, pero sanitizamos caracteres
+                gdf_export = sanitize_dataframe_columns(gdf_export, max_len=64)
+
+            geojson_filename = f"{layer_name}.geojson"
+            geojson_path = os.path.join(tmpdir, geojson_filename)
+
+            # Convertir fechas o diccionarios a string antes de exportar a GeoJSON
+            for col in gdf_export.columns:
+                if col != 'geometry' and gdf_export[col].dtype == 'object':
+                    gdf_export[col] = gdf_export[col].astype(str)
+
+            gdf_export.to_file(geojson_path, driver="GeoJSON", encoding="utf-8")
+
+        # Empaquetar el directorio temporal en el ZIP
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for root_dir, _, files in os.walk(tmpdir):
+                for file in files:
+                    full_path = os.path.join(root_dir, file)
+                    arcname = os.path.relpath(full_path, tmpdir)
+                    zf.write(full_path, arcname)
+
+    zip_buffer.seek(0)
+    return zip_buffer.getvalue()
